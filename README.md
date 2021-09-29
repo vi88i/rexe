@@ -1,2 +1,3 @@
 # rexe
-online judge for competitive programming
+
+![A test image](./assets/banner.png)
