@@ -10,7 +10,7 @@
 
 ## Architecture
 
-![arch](./assets/rexe.png)
+<p align="center"><img src="https://github.com/vi88i/rexe/blob/main/assets/rexe.png" alt="rexe"></p>
 
 - Node.js web server: Handles all user requests.
 - mongoDB: Stores client information.
