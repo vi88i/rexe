@@ -4,7 +4,7 @@
 
 ## Features
 
-- Remotely solve algorithmic problems and execute C++ or python code in secure environment.
+- Remotely solve algorithmic problems and execute C++ or Python code in secure environment.
 - Test your code, set memory and time limit.
 - Save and share your work.
 
@@ -12,8 +12,9 @@
 
 <p align="center"><img src="https://github.com/vi88i/rexe/blob/main/assets/rexe.png" alt="rexe"></p>
 
-- Node.js web server: Handles all user requests.
-- mongoDB: Stores client information.
-- Docker: Manage Docker containers.
-- Message queue: Queue requests.
-- AWS S3: Store static files.
+- <b>Node.js web server</b>: Handles all user requests.
+- <b>mongoDB</b>: Stores client information.
+- <b>Docker</b>: Manage Docker containers.
+- <b>AWS SQS</b>: Queue requests and responses.
+- <b>AWS S3</b>: Store static files.
+- <b>redis</b>: Caching reptitive static data.
