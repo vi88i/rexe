@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 'use strict';
 
 /* load the .env to access constants */
@@ -10,12 +11,12 @@ const express = require('express');
 const app = express();
 
 /* 404 responses */
-app.use((req, res, next) => {
-  res.status(404).send("Sorry can't find that!");
+app.use((_, res) => {
+  res.status(404).send('Sorry can\'t find that!');
 });
 
-/* global error handler */
-app.use((err, req, res, next) => {
+/* default error handler */
+app.use((err, _, res, next) => {
   if (res.headersSent) {
     next(err);
   } else if (err.msg && err.status) {
