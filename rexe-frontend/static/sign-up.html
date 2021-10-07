@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="utf-8">
+  <meta name="author" content="Vighnesh Nayak S">
+  <meta name="description" content="remote code execution service">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+  <link rel="manifest" href="site.webmanifest">
+  <title>rexe</title>
+</head>
+<body>
+  <label for="username">Username</label>
+  <input id="username" type="text">
+  <br>
+  <label for="password">Password</label>
+  <input id="password" type="password">
+  <br>
+  <button onclick="submit()">Sign up</button>
+  <p id="msg"></p>  
+  <script type="text/javascript">
+    async function submit() {
+      try {
+        const u = document.getElementById('username');
+        const p = document.getElementById('password');
+        const m = document.getElementById('msg');
+        let options = {
+          mode: 'same-origin',
+          method: 'POST',
+          cache: 'no-store',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ username: u.value,  password: p.value })
+        };
+        const res = await fetch('/verify', options);
+        const data = await res.json();
+        m.innerText = data.msg;
+        if (res.ok) {
+          await new Promise((resolve, _) => {
+            setInterval(() => {
+             resolve(); 
+            }, 1500);
+          });
+          window.location.href = '/sign-in.html';
+        } 
+      } catch(err) {
+        console.log(err);
+      }
+    }
+  </script>
+</body>
+</html>

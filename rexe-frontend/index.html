@@ -4,28 +4,26 @@
   <meta charset="utf-8">
   <meta name="author" content="Vighnesh Nayak S">
   <meta name="description" content="remote code execution service">
-  <link rel="apple-touch-icon" sizes="180x180" href="static/icon/apple-touch-icon.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="static/icon/favicon-32x32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="static/icon/favicon-16x16.png">
-  <link rel="manifest" href="static/icon/site.webmanifest">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+  <link rel="manifest" href="site.webmanifest">
   <title>rexe</title>
 </head>
 <body>
   <h1>rexe</h1>
-  <button onclick="loadSignIn()">Sign in</button>
-  <button onclick="loadSignUp()">Sign up</button>
+  <button onclick="loadPage('/sign-in')">Sign in</button>
+  <button onclick="loadPage('/sign-up')">Sign up</button>
   <script type="text/javascript">
-    async function loadSignIn() {
+    async function loadPage(location) {
       try {
-        const res = await fetch('static/sign-in');
+        const res = await fetch(location);
+        if (!res.ok) {
+          console.log(res);
+        } else if (res.redirected) {
+          window.location.href = res.url;
+        }
       } catch(err) {
-        console.log(err);
-      }
-    }
-    async function loadSignUp() {
-      try {
-        const res = await fetch('static/sign-up');
-      } catch (err) {
         console.log(err);
       }
     }
