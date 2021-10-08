@@ -164,7 +164,7 @@ app.get('/sign-out', requireAuthorization, (req, res) => {
 });
 
 /* process code submission */
-app.post('/run', requireAuthorization, (req, res) => {
+app.post('/run', requireAuthorization, (req, res, next) => {
   /*
     TODO:
     1. Check in cache
@@ -172,6 +172,8 @@ app.post('/run', requireAuthorization, (req, res) => {
     3. Prevent duplicate request by same user on same file
   */
   if (req.body.filename && req.body.filename.length > 0 && req.body.code && req.body.code.length > 0) {
+    const memory_limit = req.body.memory_limit || process.env.MEMORY_LIMIT;
+    const time_limit = req.body.time_limit || process.env.TIME_LIMIT;
     res.status(200).json({ msg: 'Your code is being processed' });
   } else {
     res.status(200).json({ msg: 'Filename and code cannot be empty' });

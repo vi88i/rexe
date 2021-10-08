@@ -21,7 +21,7 @@
       grid-row: 1 / span 2;
       grid-column: 1 / span 2;
     }
-    #test_div {
+    #input_div {
       grid-row: 1 / span 2;
       grid-column: 3; 
     }     
@@ -32,7 +32,7 @@
     #code {
       resize: none;
     }
-    #test {
+    #input {
       resize: none;
     }
     #output {
@@ -60,7 +60,7 @@
     <div id="code_div">     
       <p>
         <span>
-          <select name="cars" id="lang  ">
+          <select name="cars" id="lang">
             <option value="cpp">C++</option>
             <option value="py">Python</option>
           </select>          
@@ -73,12 +73,17 @@
       </p>
       <textarea spellcheck="false" id="code" rows="40" cols="130"></textarea>
     </div>
-    <div id="test_div">
-      <h3>Test</h3>
-      <textarea spellcheck="false" id="test" rows="18" cols="60"></textarea>
+    <div id="input_div">
+        <p>Input
+          <span>
+            <input id="time_limit" type="text" placeholder="time limit: 2s">
+            <input id="memory_limit" type="text" placeholder="memory limit: 256MB">
+          </span>
+        </p>
+      <textarea spellcheck="false" id="input" rows="18" cols="60"></textarea>
     </div>
     <div id="output_div">
-      <h3>Output</h3>
+      <p>Output</p>
       <textarea spellcheck="false" id="output" rows="18" cols="60" readonly></textarea>
     </div>    
   </div> 
@@ -103,8 +108,10 @@
     async function run() {
       const f = document.getElementById('filename');
       const c = document.getElementById('code');
-      const t = document.getElementById('test');
+      const t = document.getElementById('input');
       const l = document.getElementById('lang');
+      const ti = document.getElementById('time_limit');
+      const m = document.getElementById('memory_limit');
 
       try {
         let options = {
@@ -115,7 +122,14 @@
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ filename: f.value, code: c.value, test: t.value, lang: l.value })
+          body: JSON.stringify({ 
+            filename: f.value, 
+            code: c.value, 
+            input: t.value, 
+            lang: l.value, 
+            time_limit: ti.value.length === 0 ? null : ti.value, 
+            memory_limit: m.value.length === 0 ? null : m.value  
+          })
         };
         const res = await fetch('/run', options);
         if (!res.ok) {
@@ -160,7 +174,7 @@
     //   }      
     // }
     // document.getElementById('code').addEventListener('keydown', enableTab(e));
-    // document.getElementById('test').addEventListener('keydown', enableTab(e));
+    // document.getElementById('input').addEventListener('keydown', enableTab(e));
   </script> 
 </body>
 </html>
