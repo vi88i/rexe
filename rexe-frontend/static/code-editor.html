@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="utf-8">
+  <meta name="author" content="Vighnesh Nayak S">
+  <meta name="description" content="remote code execution service">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+  <link rel="manifest" href="site.webmanifest">
+  <style type="text/css">
+    #grid-container {
+      display: grid;
+      grid-template-columns: auto auto auto;
+      grid-template-columns: auto auto auto;
+      grid-gap: 1%;
+      margin: auto;
+      width: 95%;      
+    }
+    #code_div {
+      grid-row: 1 / span 2;
+      grid-column: 1 / span 2;
+    }
+    #test_div {
+      grid-row: 1 / span 2;
+      grid-column: 3; 
+    }     
+    #output_div {
+      grid-row: 2;
+      grid-column: 3; 
+    }  
+    #code {
+      resize: none;
+    }
+    #test {
+      resize: none;
+    }
+    #output {
+      resize: none;
+    }      
+    #navbar {
+      background-color: midnightblue;
+      margin: auto;
+      width: 50%;
+      padding: 4px;
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+  <title>rexe</title>
+</head>
+<body>
+  <div id="navbar">
+    <span id="username"></span>
+    <div>
+      <button onclick="signOut()">Log out</button>
+    </div>
+  </div>   
+  <div id="grid-container">
+    <div id="code_div">     
+      <p>
+        <span>
+          <select name="cars" id="lang  ">
+            <option value="cpp">C++</option>
+            <option value="py">Python</option>
+          </select>          
+          <input placeholder="filename" id="filename" type="text">
+          <button style="cursor: not-allowed;" disabled>Load</button>
+          <button style="cursor: not-allowed;" disabled>Save</button>
+          <button onclick="run()">Run</button>
+          <span id="info"></span>
+        </span>
+      </p>
+      <textarea spellcheck="false" id="code" rows="40" cols="130"></textarea>
+    </div>
+    <div id="test_div">
+      <h3>Test</h3>
+      <textarea spellcheck="false" id="test" rows="18" cols="60"></textarea>
+    </div>
+    <div id="output_div">
+      <h3>Output</h3>
+      <textarea spellcheck="false" id="output" rows="18" cols="60" readonly></textarea>
+    </div>    
+  </div> 
+  <script type="text/javascript">
+    async function signOut() {
+      try {
+        let options = {
+          method: 'GET',
+          mode: 'same-origin',
+          cache: 'no-store',
+          credentials: 'same-origin'
+        };
+        const res = await fetch('/sign-out', options);
+        if (res.ok) {
+          window.location.href = '/';
+        }
+      } catch(err) {
+        console.log(err);
+      }      
+    }
+
+    async function run() {
+      const f = document.getElementById('filename');
+      const c = document.getElementById('code');
+      const t = document.getElementById('test');
+      const l = document.getElementById('lang');
+
+      try {
+        let options = {
+          method: 'POST',
+          mode: 'same-origin',
+          cache: 'no-store',
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ filename: f.value, code: c.value, test: t.value, lang: l.value })
+        };
+        const res = await fetch('/run', options);
+        if (!res.ok) {
+          window.location.href = '/';
+        } else {
+          const data = await res.json();
+          document.getElementById('info').innerText = data.msg;
+        }
+      } catch(err) {
+        console.log(err);
+      }      
+    }
+
+    async function isLoggedIn() {
+      try {
+        let options = {
+          method: 'GET',
+          mode: 'same-origin',
+          cache: 'no-store',
+          credentials: 'same-origin'
+        };
+        const res = await fetch('/isLoggedIn', options);
+        if (!res.ok) {
+          window.location.href = '/';
+        }
+      } catch(err) {
+        console.log(err);
+      }
+    }
+    isLoggedIn()
+      .then(() => {
+        document.getElementById('username').innerText = document.cookie.split('=')[1];
+      });
+    // /* source: https://stackoverflow.com/questions/6637341/use-tab-to-indent-in-textarea */
+    // function enableTab(e) {
+    //   if (e.key == 'Tab') {
+    //     e.preventDefault();
+    //     let start = this.selectionStart;
+    //     let end = this.selectionEnd;
+    //     this.value = this.value.substring(0, start) + '\t' + this.value.substring(end);
+    //     this.selectionStart = this.selectionEnd = start + 1;
+    //   }      
+    // }
+    // document.getElementById('code').addEventListener('keydown', enableTab(e));
+    // document.getElementById('test').addEventListener('keydown', enableTab(e));
+  </script> 
+</body>
+</html>

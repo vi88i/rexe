@@ -20,6 +20,22 @@
   <button onclick="submit()">Sign up</button>
   <p id="msg"></p>  
   <script type="text/javascript">
+    (async function isLoggedIn() {
+      try {
+        let options = {
+          method: 'GET',
+          mode: 'same-origin',
+          cache: 'no-store',
+          credentials: 'same-origin'
+        };
+        const res = await fetch('/isLoggedIn', options);
+        if (res.ok) {
+          window.location.href = '/code-editor.html';
+        }
+      } catch(err) {
+        console.log(err);
+      }
+    })();
     async function submit() {
       try {
         const u = document.getElementById('username');
@@ -43,7 +59,7 @@
              resolve(); 
             }, 1500);
           });
-          // window.location.href = '/sign-in.html';
+          window.location.href = '/code-editor.html';
         } 
       } catch(err) {
         console.log(err);

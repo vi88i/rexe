@@ -15,6 +15,22 @@
   <button onclick="loadPage('/sign-in')">Sign in</button>
   <button onclick="loadPage('/sign-up')">Sign up</button>
   <script type="text/javascript">
+    (async function isLoggedIn() {
+      try {
+        let options = {
+          method: 'GET',
+          mode: 'same-origin',
+          cache: 'no-store',
+          credentials: 'same-origin'
+        };
+        const res = await fetch('/isLoggedIn', options);
+        if (res.ok) {
+          window.location.href = '/code-editor.html';
+        }
+      } catch(err) {
+        console.log(err);
+      }
+    })();  
     async function loadPage(location) {
       try {
         const res = await fetch(location);
