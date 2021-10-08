@@ -1,0 +1,10 @@
+{
+  "Type": "FIFO",
+  "Visibility timeout": 30,
+  "Message retention period": 120,
+  "Delivery delay": 0,
+  "Maximum message size": "256KB",
+  "Receive message wait time": 0,
+  "Enable high throughtput FIFO": false,
+  "Access policy": "Basic"
+}

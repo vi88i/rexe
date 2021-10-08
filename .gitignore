@@ -10,3 +10,7 @@ node_modules/
 
 # dotenv environment variables file
 .env
+
+# aws config files
+vi88i-dev.csv
+aws_config.json

@@ -12,8 +12,13 @@ const crypto = require('crypto');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
+const AWS = require('aws-sdk');
 const express = require('express');
 const db = require('./db/index');
+
+/* setup AWS config and SQS */
+AWS.config.loadFromPath('./aws_config.json');
+const sqs = new AWS.SQS({ apiVersion: '2012-11-05' });
 
 /* create express application */
 const app = express();
@@ -171,10 +176,46 @@ app.post('/run', requireAuthorization, (req, res, next) => {
     2. Queue on SQS
     3. Prevent duplicate request by same user on same file
   */
-  if (req.body.filename && req.body.filename.length > 0 && req.body.code && req.body.code.length > 0) {
+  if (
+    req.body.filename && req.body.filename.length > 0 && 
+    req.body.code && req.body.code.length > 0 &&
+    req.body.lang && ['cpp', 'py'].indexOf(req.body.lang) !== -1
+  ) {
     const memory_limit = req.body.memory_limit || process.env.MEMORY_LIMIT;
     const time_limit = req.body.time_limit || process.env.TIME_LIMIT;
-    res.status(200).json({ msg: 'Your code is being processed' });
+
+    const packet = {
+      ...req.body,
+      memory_limit: memory_limit,
+      time_limit: time_limit
+    };
+
+    const params = {
+      MessageAttributes: {
+        "author": {
+          DataType: "String",
+          StringValue: req.body.username
+        },
+        "filename": {
+          DataType: "String",
+          StringValue: req.body.filename          
+        }
+      },
+      MessageBody: JSON.stringify(packet),
+      MessageDeduplicationId: req.body.username + '-' + req.body.lang, // come up with something better here
+      MessageGroupId: "Group1",    
+      QueueUrl: req.body.lang === 'cpp' ? process.env.SQS_CPP_URL : process.env.SQS_PY_URL   
+    };
+    
+    sqs.sendMessage(params, (err, data) => {
+      if (err) {
+        console.log("Error", err);
+        res.status(200).json({ msg: 'Failed to process your request' });
+      } else {
+        console.log("Success", data.MessageId);
+        res.status(200).json({ msg: 'Your code is being processed' });
+      }
+    });    
   } else {
     res.status(200).json({ msg: 'Filename and code cannot be empty' });
   }
