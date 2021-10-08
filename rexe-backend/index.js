@@ -10,6 +10,8 @@ require('dotenv').config();
 /* require all modules here */
 const crypto = require('crypto');
 const path = require('path');
+const cookieParser = require('cookie-parser');
+const jwt = require('jsonwebtoken');
 const express = require('express');
 const db = require('./db/index');
 
@@ -18,6 +20,8 @@ const app = express();
 
 /* add JSON body parser */
 app.use(express.json());
+/* add cookie parser middleware */
+app.use(cookieParser(process.env.COOKIE_SECRET));
 
 /* basic logging for requests */
 app.use((req, _, next) => {
@@ -87,6 +91,23 @@ app.post('/auth', async (req, res, next) => {
       if (rows[0].count === 0) {
         throw { status: 401, msg: 'Invalid username or password!' };
       }
+      let token = jwt.sign({ username: req.body.username }, process.env.JWT_SECRET, {
+        expiresIn: '1h',
+        issuer: 'rexe',
+      });
+      res.cookie('token', token, {
+        httpOnly: true,
+        maxAge: 60 * 60 * 1000,
+        secure: false,
+        signed: true,
+        sameSite: 'strict',  
+      });     
+      res.cookie('username', req.body.username, {
+        httpOnly: false,
+        maxAge: 60 * 60 * 1000,
+        secure: false,
+        sameSite: 'strict',
+      }); 
       res.status(200).json({ msg: 'Success, redirecting you to code editor' });
     } catch (err) {
       next(err);
@@ -97,6 +118,63 @@ app.post('/auth', async (req, res, next) => {
     }
   } else {
     next({ status: 400, msg: 'Username and password cannot be empty' });
+  }
+});
+
+/* check if user is logged in */
+app.get('/isLoggedIn', (req, res) => {
+  if (req.signedCookies) {
+    let token = req.signedCookies.token;
+    jwt.verify(token, process.env.JWT_SECRET, (err) => {
+      if (err) {
+        res.status(401).json({ msg: 'Unauthorized' });
+      } else {
+        res.status(200).json({ msg: 'ok' });
+      }
+    });    
+  } else {
+    res.status(401).json({ msg: 'Unauthorized' });
+  }
+});
+
+/* authorization middleware */
+const requireAuthorization = (req, res, next) => {
+  if (req.signedCookies) {
+    let token = req.signedCookies.token;
+    jwt.verify(token, process.env.JWT_SECRET, function(err, decoded) {
+      if (err) {
+        next({ status: 401, msg: 'Unauthorized' });
+      } else {
+        req.user = {};
+        req.user.username = decoded.username;
+      }
+      next();
+    });    
+  } else {
+    next({ status: 401, msg: 'Unauthorized' });
+  }
+};
+
+/* sign out the user */
+app.get('/sign-out', requireAuthorization, (req, res) => {
+  // TODO: blacklist token in redis till TTL
+  res.clearCookie('username');
+  res.clearCookie('token');
+  res.status(200).json({ msg: 'ok' });
+});
+
+/* process code submission */
+app.post('/run', requireAuthorization, (req, res) => {
+  /*
+    TODO:
+    1. Check in cache
+    2. Queue on SQS
+    3. Prevent duplicate request by same user on same file
+  */
+  if (req.body.filename && req.body.filename.length > 0 && req.body.code && req.body.code.length > 0) {
+    res.status(200).json({ msg: 'Your code is being processed' });
+  } else {
+    res.status(200).json({ msg: 'Filename and code cannot be empty' });
   }
 });
 
