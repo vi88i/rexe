@@ -17,7 +17,7 @@ const express = require('express');
 const db = require('./db/index');
 
 /* setup AWS config and SQS */
-AWS.config.loadFromPath('./aws_config.json');
+AWS.config.loadFromPath(path.join('..', 'aws_config.json'));
 const sqs = new AWS.SQS({ apiVersion: '2012-11-05' });
 
 /* create express application */
@@ -43,7 +43,7 @@ app.use((_, res, next) => {
 });
 
 /* serve static files */
-app.use(express.static('..\\rexe-frontend\\static'));
+app.use(express.static(path.join('..', 'rexe-frontend', 'static')));
 
 /* home page route */
 app.get('/', (_, res) => {
