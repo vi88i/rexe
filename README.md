@@ -17,7 +17,7 @@
 - <b>Docker</b>: Manage Docker containers.
 - <b>AWS SQS</b>: Queue requests and responses.
 - <b>AWS S3</b>: Store static files.
-- <b>redis</b>: Caching reptitive static data.
+- <b>redis</b>: Caching static data.
 
 ## TODO
 
