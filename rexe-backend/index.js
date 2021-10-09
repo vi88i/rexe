@@ -152,8 +152,7 @@ const requireAuthorization = (req, res, next) => {
       if (err) {
         next({ status: 401, msg: 'Unauthorized' });
       } else {
-        req.user = {};
-        req.user.username = decoded.username;
+        res.locals.username = decoded.username;
       }
       next();
     });    
@@ -179,7 +178,7 @@ app.post('/run', requireAuthorization, (req, res, next) => {
     3. Prevent duplicate request by same user on same file
   */
   const { code, filename, lang, time_limit, memory_limit } = req.body;
-  const username = req.user.username;
+  const username = res.locals.username;
 
   if (filename && filename.length > 0 && code && code.length > 0) {
     if (lang && ['cpp', 'py'].indexOf(lang) === -1) {
