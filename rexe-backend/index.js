@@ -62,16 +62,17 @@ app.get('/sign-up', (_, res) => {
 
 /* verify sign up credentials */
 app.post('/verify', async (req, res, next) => {
-  if (req.body.username && req.body.username.length > 0 && req.body.username && req.body.username.length > 0) {
+  const { username, password } = req.body;
+  if (username && username.length > 0 && password && password.length > 0) {
     let conn = null;
     try {
       conn = await db.getConnection();
-      const { rows } = await db.query(conn, 'SELECT COUNT(*) AS count FROM users WHERE username = ?', [req.body.username]);
+      const { rows } = await db.query(conn, 'SELECT COUNT(*) AS count FROM users WHERE username = ?', [username]);
       if (rows[0].count > 0) {
         throw { status: 409, msg: 'Username already exists!' };
       }
-      const hash = crypto.createHash('sha256').update(req.body.password).digest('hex');
-      await db.query(conn, 'INSERT INTO users VALUES(?, ?)', [req.body.username, hash]);
+      const hash = crypto.createHash('sha256').update(password).digest('hex');
+      await db.query(conn, 'INSERT INTO users VALUES(?, ?)', [username, hash]);
       res.status(200).json({ msg: 'Success, redirecting you to sign in page' });
     } catch (err) {
       next(err);
@@ -87,16 +88,17 @@ app.post('/verify', async (req, res, next) => {
 
 /* authenticate */
 app.post('/auth', async (req, res, next) => {
-  if (req.body.username && req.body.username.length > 0 && req.body.username && req.body.username.length > 0) {
+  const { username, password } = req.body;
+  if (username && username.length > 0 && password && password.length > 0) {
     let conn = null;
     try {
       conn = await db.getConnection();
-      const hash = crypto.createHash('sha256').update(req.body.password).digest('hex');
-      const { rows } = await db.query(conn, 'SELECT COUNT(*) AS count FROM users WHERE username = ? AND password_hash = ?', [req.body.username, hash]);
+      const hash = crypto.createHash('sha256').update(password).digest('hex');
+      const { rows } = await db.query(conn, 'SELECT COUNT(*) AS count FROM users WHERE username = ? AND password_hash = ?', [username, hash]);
       if (rows[0].count === 0) {
         throw { status: 401, msg: 'Invalid username or password!' };
       }
-      let token = jwt.sign({ username: req.body.username }, process.env.JWT_SECRET, {
+      let token = jwt.sign({ username: username }, process.env.JWT_SECRET, {
         expiresIn: '1h',
         issuer: 'rexe',
       });
@@ -107,7 +109,7 @@ app.post('/auth', async (req, res, next) => {
         signed: true,
         sameSite: 'strict',  
       });     
-      res.cookie('username', req.body.username, {
+      res.cookie('username', username, {
         httpOnly: false,
         maxAge: 60 * 60 * 1000,
         secure: false,
@@ -176,35 +178,42 @@ app.post('/run', requireAuthorization, (req, res, next) => {
     2. Queue on SQS
     3. Prevent duplicate request by same user on same file
   */
-  if (
-    req.body.filename && req.body.filename.length > 0 && 
-    req.body.code && req.body.code.length > 0 &&
-    req.body.lang && ['cpp', 'py'].indexOf(req.body.lang) !== -1
-  ) {
-    const memory_limit = req.body.memory_limit || process.env.MEMORY_LIMIT;
-    const time_limit = req.body.time_limit || process.env.TIME_LIMIT;
+  const { code, filename, lang, time_limit, memory_limit } = req.body;
+  const username = req.user.username;
+
+  if (filename && filename.length > 0 && code && code.length > 0) {
+    if (lang && ['cpp', 'py'].indexOf(lang) === -1) {
+      throw { status: 200, msg: 'Invalid language code' };
+    }
+
+    let mb = Math.floor(Number(memory_limit)); 
+    let sec = Math.floor(Number(time_limit));
+
+    if (Number.isNaN(mb) || Number.isNaN(sec) || mb < 1 || mb > 512 || sec < 1 || sec > 7) {
+      throw { status: 200, msg: 'Invalid memory or time limit' };
+    }
 
     const packet = {
       ...req.body,
-      memory_limit: memory_limit,
-      time_limit: time_limit
+      memory_limit: mb,
+      time_limit: sec
     };
 
     const params = {
       MessageAttributes: {
         "author": {
           DataType: "String",
-          StringValue: req.body.username
+          StringValue: username
         },
         "filename": {
           DataType: "String",
-          StringValue: req.body.filename          
+          StringValue: filename          
         }
       },
       MessageBody: JSON.stringify(packet),
-      MessageDeduplicationId: req.body.username + '-' + req.body.lang, // come up with something better here
+      MessageDeduplicationId: username + '-' + lang + '-' + filename, 
       MessageGroupId: "Group1",    
-      QueueUrl: req.body.lang === 'cpp' ? process.env.SQS_CPP_URL : process.env.SQS_PY_URL   
+      QueueUrl: lang === 'cpp' ? process.env.SQS_CPP_URL : process.env.SQS_PY_URL   
     };
     
     sqs.sendMessage(params, (err, data) => {
