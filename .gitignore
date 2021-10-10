@@ -15,5 +15,7 @@ node_modules/
 vi88i-dev.csv
 aws_config.json
 
-# todo
+# static
 todo
+*.exe
+__pycache__
