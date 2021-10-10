@@ -20,7 +20,7 @@ exports.getConnection = () => {
       resolve(conn);
     });
   });  
-}
+};
 
 /* promisify connection.query */
 exports.query = (conn, q, args) => {
@@ -32,4 +32,4 @@ exports.query = (conn, q, args) => {
       resolve({ rows: results });
     });
   });
-}
+};

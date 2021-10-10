@@ -271,31 +271,31 @@ app.post('/run', requireAuthorization, async (req, res, next) => {
   
       const params = {
         MessageAttributes: {
-          "author": {
-            DataType: "String",
+          'author': {
+            DataType: 'String',
             StringValue: username
           },
-          "filename": {
-            DataType: "String",
+          'filename': {
+            DataType: 'String',
             StringValue: filename          
           },
-          "lang": {
-            DataType: "String",
+          'lang': {
+            DataType: 'String',
             StringValue: lang          
           }         
         },
         MessageBody: JSON.stringify(packet),
-        MessageDeduplicationId: username + '-' + lang + '-' + filename, 
-        MessageGroupId: "Group1",    
-        QueueUrl: lang === 'cpp' ? process.env.SQS_CPP_URL : process.env.SQS_PY_URL   
+        MessageDeduplicationId: username + '-' + lang + '-' + filename,
+        MessageGroupId: 'Group1',    
+        QueueUrl: lang === 'cpp' ? process.env.SQS_CPP_URL : process.env.SQS_PY_URL
       };
       
       sqs.sendMessage(params, (err, data) => {
         if (err) {
-          console.log("Error", err);
+          console.log('Error', err);
           res.status(200).json({ msg: 'Failed to process your request' });
         } else {
-          console.log("Success", data.MessageId);
+          console.log('Success', data.MessageId);
           res.status(200).json({ msg: 'Your code is being processed' });
         }
       });
