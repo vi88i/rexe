@@ -76,8 +76,8 @@
     <div id="input_div">
         <p>Input
           <span>
-            <input id="time_limit" type="text" placeholder="time limit: 2s">
-            <input id="memory_limit" type="text" placeholder="memory limit: 256MB">
+            <input id="time_limit" type="text" placeholder="time limit:[2, 7] seconds">
+            <input id="memory_limit" type="text" placeholder="memory limit:[256, 512] MB">
           </span>
         </p>
       <textarea spellcheck="false" id="input" rows="18" cols="60"></textarea>
@@ -85,7 +85,8 @@
     <div id="output_div">
       <p>Output</p>
       <textarea spellcheck="false" id="output" rows="18" cols="60" readonly></textarea>
-    </div>    
+    </div>
+    <b>Code and test cases cannot exceed 256KB.</b>    
   </div> 
   <script type="text/javascript">
     async function signOut() {
@@ -132,11 +133,11 @@
           })
         };
         const res = await fetch('/run', options);
-        if (!res.ok) {
-          window.location.href = '/';
-        } else {
+        if ([200, 400, 429, 500].indexOf(res.status) !== -1) {
           const data = await res.json();
           document.getElementById('info').innerText = data.msg;
+        } else {
+          window.location.href = '/';
         }
       } catch(err) {
         console.log(err);
