@@ -270,22 +270,8 @@ app.post('/run', requireAuthorization, async (req, res, next) => {
       };
   
       const params = {
-        MessageAttributes: {
-          'author': {
-            DataType: 'String',
-            StringValue: username
-          },
-          'filename': {
-            DataType: 'String',
-            StringValue: filename          
-          },
-          'lang': {
-            DataType: 'String',
-            StringValue: lang          
-          }         
-        },
         MessageBody: JSON.stringify(packet),
-        MessageDeduplicationId: username + '-' + lang + '-' + filename,
+        MessageDeduplicationId: submissionKey,
         MessageGroupId: 'Group1',    
         QueueUrl: lang === 'cpp' ? process.env.SQS_CPP_URL : process.env.SQS_PY_URL
       };

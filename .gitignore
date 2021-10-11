@@ -19,3 +19,4 @@ aws_config.json
 todo
 *.exe
 __pycache__
+.vscode/
