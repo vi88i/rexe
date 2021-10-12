@@ -4,43 +4,23 @@
 /* get environment */
 const environment = process.env.NODE_ENV || 'development';
 
-/* load the .env to access constants */
-require('dotenv').config();
-
 /* require all modules here */
+require('dotenv').config();
 const crypto = require('crypto');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
 const AWS = require('aws-sdk');
-const redis = require('redis');
 const express = require('express');
-const db = require('./db/index');
+const db = require('./mysqldb/index');
+const { redisAuthClient, redisSubClient } = require('./redisdb/index');
 
 /* setup AWS config and SQS */
 AWS.config.loadFromPath(path.join('..', 'aws_config.json'));
 const sqs = new AWS.SQS({ apiVersion: '2012-11-05' });
 
-/* setup connection to token blacklist database and user submission request database */
-const redisAuthClient = redis.createClient({
-  host: process.env.REDIS_HOST,
-  port: process.env.REDIS_PORT,
-  db: process.env.REDIS_BLACKLIST_DB
-});
-
-const redisSubClient = redis.createClient({
-  host: process.env.REDIS_HOST,
-  port: process.env.REDIS_PORT,
-  db: process.env.REDIS_SUBMISSION_DB  
-});
-
-redisAuthClient.on('error', (err) => {
-  console.log(err);
-  process.exit(0);
-});
-
-redisSubClient.on('error', (err) => {
-  console.log(err);
+process.on('SIGINT', async () => {
+  await db.end();
   process.exit(0);
 });
 

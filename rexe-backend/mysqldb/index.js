@@ -33,3 +33,15 @@ exports.query = (conn, q, args) => {
     });
   });
 };
+
+/* promisify close connection */
+exports.end = () => {
+  return new Promise((resolve, reject) => {
+    pool.end((err) => {
+      if (err) {
+        reject(err);
+      }
+      resolve();
+    });
+  });
+};

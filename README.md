@@ -23,8 +23,14 @@
 
 ```bash
 cd rexe-backend/containers/cpp
+npm install
 docker build -t cpp-container . # only once for every change you make to application you run on docker
 docker run -i -t --rm cpp-container # start the docker container
+cd ..
+cd py
+npm install
+docker build -t py-container . # only once for every change you make to application you run on docker
+docker run -i -t --rm py-container # start the docker container
 ```
 
 ## TODO

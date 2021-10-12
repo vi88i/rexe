@@ -29,6 +29,11 @@ const sqs = new AWS.SQS({ apiVersion: '2012-11-05' });
 
 const stub = fs.readFileSync('stub.cpp', { encoding: 'utf8', flag: 'r' });
 
+process.on('SIGINT', () => {
+  console.log('Bye!');
+  process.exit(0);
+});
+
 const run = async (body) => {
   const binaryFilename = process.platform === 'win32' ? 'output' : './output';
   const data = JSON.parse(body);
@@ -186,11 +191,6 @@ const sqsConsumer = (id) => {
     });
   });
 };
-
-process.on('SIGINT', () => {
-  console.log('Bye!');
-  process.exit(0);
-});
 
 (async function startSQSCppConsumer() {
   const status = true;
