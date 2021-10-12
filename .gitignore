@@ -20,3 +20,4 @@ todo
 *.exe
 __pycache__
 .vscode/
+dummy.*

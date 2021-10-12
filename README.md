@@ -19,6 +19,14 @@
 - <b>AWS S3</b>: Store static files.
 - <b>redis</b>: Caching static data.
 
+## Build and Run containers
+
+```bash
+cd rexe-backend/containers/cpp
+docker build -t cpp-container . # only once for every change you make to application you run on docker
+docker run -i -t --rm cpp-container # start the docker container
+```
+
 ## TODO
 
 - Explain why you chose each technology

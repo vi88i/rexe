@@ -245,24 +245,14 @@ app.post('/run', requireAuthorization, async (req, res, next) => {
       if (status) {
         throw { status: 429, msg: 'Your previous submission for same problem is still being processed' };
       }
-  
-      await new Promise((resolve, reject) => {
-        redisSubClient.set(submissionKey, '1', 'EX', process.env.SQS_SUBMISSON_RETENTION_PERIOD, (err) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve();
-          }
-        });
-      });
-  
+    
       let mb = Math.floor(Number(memory_limit)); 
       let sec = Math.floor(Number(time_limit));
   
-      if (Number.isNaN(mb) || Number.isNaN(sec) || mb < 1 || mb > 512 || sec < 1 || sec > 7) {
+      if (Number.isNaN(mb) || Number.isNaN(sec) || mb < 32 || mb > 512 || sec < 2 || sec > 7) {
         throw { status: 400, msg: 'Invalid memory or time limit' };
       }
-  
+
       const packet = {
         ...req.body,
         memory_limit: mb,
@@ -276,15 +266,27 @@ app.post('/run', requireAuthorization, async (req, res, next) => {
         QueueUrl: lang === 'cpp' ? process.env.SQS_CPP_URL : process.env.SQS_PY_URL
       };
       
-      sqs.sendMessage(params, (err, data) => {
-        if (err) {
-          console.log('Error', err);
-          res.status(200).json({ msg: 'Failed to process your request' });
-        } else {
-          console.log('Success', data.MessageId);
-          res.status(200).json({ msg: 'Your code is being processed' });
-        }
+      await new Promise((resolve, reject) => {
+        sqs.sendMessage(params, (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
       });
+
+      await new Promise((resolve, reject) => {
+        redisSubClient.set(submissionKey, '1', 'EX', process.env.SQS_SUBMISSON_RETENTION_PERIOD, (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      res.status(200).json({ msg: 'Your code is being processed' });
     } else {
       res.status(400).json({ msg: 'Filename and code cannot be empty' });
     }
