@@ -65,30 +65,47 @@
             <option value="py">Python</option>
           </select>          
           <input placeholder="filename" id="filename" type="text">
-          <button style="cursor: not-allowed;" disabled>Load</button>
-          <button style="cursor: not-allowed;" disabled>Save</button>
-          <button onclick="run()">Run</button>
+          <button id="load">Load</button>
+          <button id="save">Save</button>
+          <button id="run" onclick="run()">Run</button>
           <span id="info"></span>
         </span>
       </p>
-      <textarea spellcheck="false" id="code" rows="40" cols="130"></textarea>
+      <textarea spellcheck="false" id="code" rows="40" cols="130" placeholder="write your code here"></textarea>
     </div>
     <div id="input_div">
-        <p>Input
+        <p>
           <span>
             <input id="time_limit" type="text" placeholder="time limit:[2, 7] seconds">
             <input id="memory_limit" type="text" placeholder="memory limit:[32, 512] MB">
           </span>
         </p>
-      <textarea spellcheck="false" id="input" rows="18" cols="60"></textarea>
+      <textarea spellcheck="false" id="input" rows="19" cols="60" placeholder="stdin"></textarea>
     </div>
     <div id="output_div">
-      <p>Output</p>
-      <textarea spellcheck="false" id="output" rows="18" cols="60" readonly></textarea>
-    </div>
-    <p>Total size of code and test cases cannot exceed 256KB. Output is restricted to 500 KB.</p>    
+      <span id="execInfo"></span>
+      <textarea id="output" spellcheck="false" id="output" rows="19" cols="60" placeholder="stdout" readonly></textarea>
+    </div>    
   </div> 
+  <p style="margin-left: 3%;">Total size of code and test cases cannot exceed 256KB. Output is restricted to 500 KB.</p>
   <script type="text/javascript">
+    function disableOps() {
+      ['load', 'save', 'run'].forEach((e) => {
+        document.getElementById(e).style.cursor = 'not-allowed';
+        document.getElementById(e).disabled = true;
+      });
+    }
+
+    function enableOps(poll) {
+      ['load', 'save', 'run'].forEach((e) => {
+        document.getElementById(e).style.cursor = 'auto';
+        document.getElementById(e).disabled = false;
+      });
+      if (poll) {
+        clearInterval(poll);
+      }
+    }
+
     async function signOut() {
       try {
         let options = {
@@ -114,6 +131,8 @@
       const ti = document.getElementById('time_limit');
       const m = document.getElementById('memory_limit');
 
+      disableOps();
+
       try {
         let options = {
           method: 'POST',
@@ -128,18 +147,56 @@
             code: c.value, 
             input: t.value, 
             lang: l.value, 
-            time_limit: ti.value.length === 0 ? null : ti.value, 
-            memory_limit: m.value.length === 0 ? null : m.value  
+            time_limit: ti.value, 
+            memory_limit: m.value   
           })
         };
         const res = await fetch('/run', options);
         if ([200, 400, 429, 500].indexOf(res.status) !== -1) {
           const data = await res.json();
           document.getElementById('info').innerText = data.msg;
+          if (data.status && data.status === 'pending') {
+            let retry = 0;
+            const poll = setInterval(async () => {
+              // 150 * 2 = retention period
+              if (retry === 150) {
+                document.getElementById('info').innerText = 'Failed to process your previous submission';
+                enableOps(poll);
+              }
+              try {
+                const options = {
+                  mode: 'same-origin',
+                  cache: 'no-store',
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({ filename: f.value, lang: l.value })
+                };
+                const res = await fetch('/check', options);
+                const json = await res.json();
+                console.log(json);
+                if (json.status !== 'pending') {
+                  const info = [json.status, json.signal ? json.signal : '', json.time ? json.time + 'ms' : '', json.memory ? json.memory + 'MB' : ''].join(' ').replace(/\s+/g,' ').trim();
+                  document.getElementById('info').innerText = 'Finished';
+                  document.getElementById('execInfo').innerText = info;
+                  document.getElementById('output').innerText = json.output;
+                  enableOps(poll);
+                }
+              } catch(err) {
+                console.log(err);
+              } finally {
+                retry += 1;
+              }
+            }, 2000);
+          } else {
+            enableOps(null);
+          }
         } else {
           window.location.href = '/';
         }
       } catch(err) {
+        enableOps(null);
         console.log(err);
       }      
     }

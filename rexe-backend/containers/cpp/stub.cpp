@@ -52,7 +52,7 @@ public:
       exit(1);
     }
     std::ofstream file("rusage.txt");
-    file << (usage.ru_utime.tv_usec / 1000) << "," << (usage.ru_maxrss / 1024.0);
+    file << (usage.ru_utime.tv_usec / 1000.0) << "," << (usage.ru_maxrss / 1024.0);
     file.close();    
   }    
   rexeCppStub() {

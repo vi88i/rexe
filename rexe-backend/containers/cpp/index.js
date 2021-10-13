@@ -26,6 +26,7 @@ const AWS = require('aws-sdk');
 AWS.config.loadFromPath('aws_config.json');
 
 const sqs = new AWS.SQS({ apiVersion: '2012-11-05' });
+const s3 = new AWS.S3({ apiVersion: '2006-03-01' });
 
 const stub = fs.readFileSync('stub.cpp', { encoding: 'utf8', flag: 'r' });
 
@@ -34,10 +35,43 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
+const putJSON = (key, body) => {
+  return new Promise((resolve, reject) => {
+    const params = {
+      Bucket: process.env.S3_BUCKET,
+      Key: key,
+      Body: JSON.stringify(body)
+    };
+    s3.upload(params, (err) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve();
+      }
+    });
+  });  
+};
+
+const getJSON = (key) => {
+  return new Promise((resolve, reject) => {
+    const params = {
+      Bucket: process.env.S3_BUCKET,
+      Key: key
+    };
+    s3.getObject(params, (err, data) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(JSON.parse(data.Body.toString()));
+      }
+    });    
+  });
+};
+
 const run = async (body) => {
   const binaryFilename = process.platform === 'win32' ? 'output' : './output';
-  const data = JSON.parse(body);
-  const submissionKey = data.username + '-' + data.filename;
+  const submissionKey = JSON.parse(body).key;
+  const data = await getJSON('request-' + submissionKey);
 
   // write the user's code to code.cpp
   await new Promise((resolve, reject) => {
@@ -121,16 +155,8 @@ const run = async (body) => {
     }
   }
 
-  return [submissionKey, JSON.stringify(res)];
+  return [submissionKey, res];
 };
-
-function recvParams(id) {
-  return {
-    MaxNumberOfMessages: 1,
-    QueueUrl: process.env.SQS_CPP_URL,
-    ReceiveRequestAttemptId: id
-  };
-}
 
 const getRandomId = () => {
   return (Math.floor(Date.now() / 1000)).toString() + '-' + (Math.floor(Math.random() * 10000000000) + 1).toString();
@@ -155,9 +181,9 @@ const deleteSQSMessage = (id) => {
 const sendSQSMessage = (submissionKey, body) => {
   return new Promise((resolve, reject) => {
     const params = {
-      MessageBody: body,
+      MessageBody: JSON.stringify(body),
       MessageDeduplicationId: submissionKey,
-      MessageGroupId: 'Group1',    
+      MessageGroupId: process.env.SQS_GROUP,    
       QueueUrl: process.env.SQS_RES_URL
     };
     sqs.sendMessage(params, (err) => {
@@ -172,19 +198,22 @@ const sendSQSMessage = (submissionKey, body) => {
 
 const sqsConsumer = (id) => {
   return new Promise((resolve, reject) => {
-    const params = recvParams(id);
+    const params = {
+      MaxNumberOfMessages: 1,
+      QueueUrl: process.env.SQS_CPP_URL,
+      ReceiveRequestAttemptId: id
+    };
     sqs.receiveMessage(params, async (err, data) => {
       try {
         if (err) {
           reject(err);
         } else if (data.Messages) {
           const [submissionKey, body] = await run(data.Messages[0].Body);
-          await sendSQSMessage(submissionKey, body);
+          await putJSON('result-' + submissionKey, body);
+          await sendSQSMessage(submissionKey, { key: submissionKey });
           await deleteSQSMessage(data.Messages[0].ReceiptHandle);
-          resolve();
-        } else {
-          resolve();
         }
+        resolve();
       } catch(err) {
         reject(err);      
       }

@@ -7,3 +7,8 @@ CREATE TABLE users (
   password_hash VARCHAR(64),
   PRIMARY KEY (username)
 );
+
+CREATE TABLE submissions (
+  filehash VARCHAR(64),
+  PRIMARY KEY (filehash)
+);

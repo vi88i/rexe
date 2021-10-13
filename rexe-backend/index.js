@@ -10,24 +10,26 @@ const crypto = require('crypto');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
-const AWS = require('aws-sdk');
 const express = require('express');
 const db = require('./mysqldb/index');
+const { enqueue, putJSON, dequeue, deleteSQSMessage, getRandomId, getJSON } = require('./aws/index');
 const { redisAuthClient, redisSubClient } = require('./redisdb/index');
 
-/* setup AWS config and SQS */
-AWS.config.loadFromPath(path.join('..', 'aws_config.json'));
-const sqs = new AWS.SQS({ apiVersion: '2012-11-05' });
-
 process.on('SIGINT', async () => {
+  console.log('Graceful shutdown');
   await db.end();
+  redisSubClient.quit();
+  redisAuthClient.quit();
   process.exit(0);
 });
 
 /* create express application */
 const app = express();
 
-/* add JSON body parser and cookie parser */
+/* 
+  add JSON body parser and cookie parser 
+  JSON limit applies only to incoming requests
+*/
 app.use(express.json({ limit: process.env.JSON_LIMIT }));
 app.use(cookieParser(process.env.COOKIE_SECRET));
 
@@ -72,7 +74,8 @@ app.post('/verify', async (req, res, next) => {
       conn = await db.getConnection();
       const { rows } = await db.query(conn, 'SELECT COUNT(*) AS count FROM users WHERE username = ?', [username]);
       if (rows[0].count > 0) {
-        throw { status: 400, msg: 'Username already exists!' };
+        next({ status: 400, msg: 'Username already exists!' });
+        return;
       }
       const hash = crypto.createHash('sha256').update(password).digest('hex');
       await db.query(conn, 'INSERT INTO users VALUES(?, ?)', [username, hash]);
@@ -80,7 +83,7 @@ app.post('/verify', async (req, res, next) => {
     } catch (err) {
       next(err);
     } finally {
-      if (conn) {
+      if (conn && conn.state === 'authenticated') {
         conn.release();
       }
     }
@@ -99,7 +102,8 @@ app.post('/auth', async (req, res, next) => {
       const hash = crypto.createHash('sha256').update(password).digest('hex');
       const { rows } = await db.query(conn, 'SELECT COUNT(*) AS count FROM users WHERE username = ? AND password_hash = ?', [username, hash]);
       if (rows[0].count === 0) {
-        throw { status: 401, msg: 'Invalid username or password!' };
+        next({ status: 401, msg: 'Invalid username or password!' });
+        return;
       }
       let token = jwt.sign({ username: username }, process.env.JWT_SECRET, {
         expiresIn: '1h',
@@ -122,7 +126,7 @@ app.post('/auth', async (req, res, next) => {
     } catch (err) {
       next(err);
     } finally {
-      if (conn) {
+      if (conn && conn.state === 'authenticated') {
         conn.release();
       }
     }
@@ -148,13 +152,12 @@ app.get('/isLoggedIn', (req, res) => {
 });
 
 /* authorization middleware */
-const requireAuthorization = (req, res, next) => {
+const requireAuthorization = async (req, res, next) => {
   if (req.signedCookies && req.signedCookies.token) {
-    let token = req.signedCookies.token;
-    redisAuthClient.get(token, (err, reply) => {
-      if (err) {
-        next(err);
-      } else if (reply) {
+    try {
+      let token = req.signedCookies.token;
+      const reply = await redisAuthClient.get(token);
+      if (reply) {
         res.status(401).json({ msg: 'Unauthorized' });
       } else {
         jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
@@ -165,28 +168,22 @@ const requireAuthorization = (req, res, next) => {
             res.locals.ttl = decoded.exp - Math.floor(Date.now() / 1000);
           }
           next();
-        }); 
+        });
       }
-    });    
+    } catch(err) {
+      next(err);
+    }    
   } else {
     next({ status: 401, msg: 'Unauthorized' });
   }
 };
 
 /* sign out the user */
-app.get('/sign-out', requireAuthorization, async (req, res) => {
+app.get('/sign-out', requireAuthorization, async (req, res, next) => {
   try {
     if (req.signedCookies && req.signedCookies.token) {
       if (res.locals.ttl > 0) {
-        await new Promise((resolve, reject) => {
-          redisAuthClient.set(req.signedCookies.token, '1', 'EX', res.locals.ttl, (err) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve();
-            }
-          });
-        });
+        await redisAuthClient.sendCommand(['SET', req.signedCookies.token, '1', 'EX', res.locals.ttl]);
       }
       res.clearCookie('username');
       res.clearCookie('token');
@@ -202,71 +199,48 @@ app.get('/sign-out', requireAuthorization, async (req, res) => {
 /* process code submission */
 app.post('/run', requireAuthorization, async (req, res, next) => {
   try {
-    const { code, filename, lang, time_limit, memory_limit } = req.body;
+    const { code, input, filename, lang, time_limit, memory_limit } = req.body;
     const username = res.locals.username;
   
     if (filename && filename.length > 0 && code && code.length > 0) {
       if (lang && ['cpp', 'py'].indexOf(lang) === -1) {
-        throw { status: 400, msg: 'Invalid language code' };
-      }
-  
-      const submissionKey = username + '-' + filename;
-      const status = await new Promise((resolve, reject) => {
-        redisSubClient.get(submissionKey, (err, reply) => {
-          if (err) {
-            reject(err);
-          } else {
-            // reply is empty, if key is not found
-            resolve(reply);
-          }
-        });
-      });
-  
-      if (status) {
-        throw { status: 429, msg: 'Your previous submission for same problem is still being processed' };
+        next({ status: 400, msg: 'Invalid language code' });
+        return;
       }
     
+      const submissionKey = username + '-' + filename + '-' + lang;
+      const status = await redisSubClient.get(submissionKey);
+
+      if (status) {
+        next({ status: 429, msg: 'Your previous submission is still being processed' });
+        return;
+      }
+
       let mb = Math.floor(Number(memory_limit)); 
       let sec = Math.floor(Number(time_limit));
   
       if (Number.isNaN(mb) || Number.isNaN(sec) || mb < 32 || mb > 512 || sec < 2 || sec > 7) {
-        throw { status: 400, msg: 'Invalid memory or time limit' };
+        next({ status: 400, msg: 'Invalid memory or time limit' });
+        return;
       }
+
+      let hash = crypto.createHash('md5');
+      hash.update(code);
+      hash.update(input);
+      hash.update(lang);
+      hash.update(mb.toString());
+      hash.update(sec.toString());
 
       const packet = {
         ...req.body,
         memory_limit: mb,
         time_limit: sec
       };
-  
-      const params = {
-        MessageBody: JSON.stringify(packet),
-        MessageDeduplicationId: submissionKey,
-        MessageGroupId: 'Group1',    
-        QueueUrl: lang === 'cpp' ? process.env.SQS_CPP_URL : process.env.SQS_PY_URL
-      };
-      
-      await new Promise((resolve, reject) => {
-        sqs.sendMessage(params, (err) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve();
-          }
-        });
-      });
 
-      await new Promise((resolve, reject) => {
-        redisSubClient.set(submissionKey, '1', 'EX', process.env.SQS_SUBMISSON_RETENTION_PERIOD, (err) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve();
-          }
-        });
-      });
-
-      res.status(200).json({ msg: 'Your code is being processed' });
+      await putJSON('request-' + submissionKey, packet, process.env.S3_BUCKET);
+      await enqueue(submissionKey, lang === 'cpp' ? process.env.SQS_CPP_URL : process.env.SQS_PY_URL, { key: submissionKey });
+      await redisSubClient.sendCommand(['SET', submissionKey, '1', 'EX', process.env.SQS_SUBMISSON_RETENTION_PERIOD]);
+      res.status(200).json({ status: 'pending', msg: 'Your code is being processed' });
     } else {
       res.status(400).json({ msg: 'Filename and code cannot be empty' });
     }
@@ -274,6 +248,75 @@ app.post('/run', requireAuthorization, async (req, res, next) => {
     next(err);
   }
 });
+
+app.post('/check', requireAuthorization, async (req, res, next) => {
+  let conn;
+  try {
+    const { filename, lang } = req.body;
+    conn = await db.getConnection();
+    const { rows } = await db.query(
+      conn, 
+      'SELECT COUNT(username) AS count FROM submissions WHERE username=? AND filekey=? AND lang=?', 
+      [res.locals.username, filename, lang]
+    );
+    if (rows[0].count > 0) {
+      const data = await getJSON('result-' + res.locals.username + '-' + filename + '-' + lang, process.env.S3_BUCKET);
+      res.status(200).json(data);   
+    } else {
+      res.status(200).json({ status: 'pending' });
+    }
+  } catch(err) {
+    next(err);
+  } finally {
+    if (conn && conn.state === 'authenticated') {
+      conn.release();
+    }
+  }
+});
+
+/* get responses from queue */
+(async function startSQSResponseConsumer() {
+  const status = true;
+  let retry = 0, id = getRandomId(), conn = null;
+  while (status) {
+    try {
+      if (retry === 0) {
+        console.log(`Starting new request: ${id}`);
+      }
+      const res = await dequeue(id, process.env.SQS_RES_URL);
+      if (res) {
+        res.forEach(async (e) => {
+          const splits = JSON.parse(e.Body).key.split('-');
+          const u = splits[0], l = splits[splits.length - 1], f = splits.slice(1, splits.length - 1).join('-');
+          conn = await db.getConnection();
+          try {
+            await db.query(conn, 'INSERT INTO submissions VALUES(?, ?, ?)', [u, f, l]);
+          } catch (err) {
+            if (err.code !== 'ER_DUP_ENTRY') {
+              throw err;
+            }
+          }
+          await deleteSQSMessage(e.ReceiptHandle, process.env.SQS_RES_URL);
+          await redisSubClient.del([u, f, l].join('-'));
+        });
+      }
+      retry = 0, id = getRandomId();
+    } catch(err) {
+      console.log(err);
+      retry += 1;
+      if (retry === 2) {
+        console.log(`Failed request: ${id}`);
+        retry = 0, id = getRandomId();
+      } else {
+        console.log(`Retrying request: ${id}`);
+      }
+    } finally {
+      if (conn && conn.state === 'authenticated') {
+        conn.release();
+      }
+    }
+  }
+})();
 
 /* 404 responses */
 app.use((_, res) => {

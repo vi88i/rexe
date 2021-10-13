@@ -26,5 +26,10 @@ redisSubClient.on('error', (err) => {
   process.exit(0);
 });
 
+(async function connect() {
+  await redisAuthClient.connect();
+  await redisSubClient.connect();
+})();
+
 exports.redisAuthClient = redisAuthClient;
 exports.redisSubClient = redisSubClient;
