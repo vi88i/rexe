@@ -30,6 +30,30 @@ public:
 
     assert(limit.rlim_cur == bytes && limit.rlim_max == bytes);
 
+    if (setrlimit(RLIMIT_DATA, &limit) != 0) {
+      printf("Error: %s\n", strerror(errno));
+      exit(1);    
+    }
+
+    if (getrlimit(RLIMIT_DATA, &limit) != 0) {
+      printf("Error: %s\n", strerror(errno));
+      exit(1);
+    }
+
+    assert(limit.rlim_cur == bytes && limit.rlim_max == bytes);
+
+    if (setrlimit(RLIMIT_STACK, &limit) != 0) {
+      printf("Error: %s\n", strerror(errno));
+      exit(1);    
+    }
+
+    if (getrlimit(RLIMIT_STACK, &limit) != 0) {
+      printf("Error: %s\n", strerror(errno));
+      exit(1);
+    }
+
+    assert(limit.rlim_cur == bytes && limit.rlim_max == bytes);
+
     limit.rlim_cur = time;
     limit.rlim_max = time;
 

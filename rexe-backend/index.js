@@ -237,7 +237,6 @@ app.post('/run', requireAuthorization, async (req, res, next) => {
       hash.update(mb.toString());
       hash.update(sec.toString());
       const digest = hash.digest('hex');
-      console.log(digest);
 
       conn = await db.getConnection();
       console.log('[x] Checking if same submission exists in database');
