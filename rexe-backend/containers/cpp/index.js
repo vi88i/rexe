@@ -73,6 +73,8 @@ const run = async (body) => {
   const submissionKey = JSON.parse(body).key;
   const data = await getJSON('request-' + submissionKey);
 
+  console.log(submissionKey);
+
   // write the user's code to code.cpp
   await new Promise((resolve, reject) => {
     const reps = {
@@ -80,17 +82,6 @@ const run = async (body) => {
       '%TIME_LIMIT%': Number(data.time_limit)
     };
     fs.writeFile('code.cpp', stub.replace(/%\w+%/g, (e) => reps[e] || e) + data.code, { encoding: 'utf8', flag: 'w' }, (err) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve();
-      }
-    });
-  });
-
-  // write the user's input to test.txt
-  await new Promise((resolve, reject) => {
-    fs.writeFile('test.txt', data.input, { encoding: 'utf8', flag: 'w' }, (err) => {
       if (err) {
         reject(err);
       } else {
@@ -116,7 +107,7 @@ const run = async (body) => {
     res.output = output.slice(0, Math.min(output.length, Number(process.env.OUTPUT_LIMIT)));
   } else {
     // execute the binary
-    const execResult = spawnSync(binaryFilename , ['< test.txt'], {maxBuffer: Number(process.env.OUTPUT_LIMIT) });
+    const execResult = spawnSync(binaryFilename , { maxBuffer: Number(process.env.OUTPUT_LIMIT), input: data.input });
     let resourceUsage = null;
     /* when signal is delivered to process, almost always its bad for the process (somthing went wrong)  */
     res.signal = execResult.signal ? execResult.signal : null;
@@ -135,7 +126,7 @@ const run = async (body) => {
       res.status = 'Time Limit Exceeded';
     } else if (res.signal === 'SIGSEGV') {
       // check man page of setrlimit() for RLIMIT_AS
-      if (Number(resourceUsage[1]) > Number(data.memory_limit)) {
+      if (resourceUsage && Number(resourceUsage[1]) > Number(data.memory_limit)) {
         res.status = 'Memory Limit Exceeded';
       } else {
         res.status = 'Segmentation fault';
@@ -154,6 +145,14 @@ const run = async (body) => {
       res.output = output.slice(0, Math.min(output.length, Number(process.env.OUTPUT_LIMIT)));
     }
   }
+
+  const tmp = {};
+  Object.keys(res).forEach((key) => {
+    if (key !== 'output') {
+      tmp[key] = res[key];
+    }
+  });
+  console.log(tmp);
 
   return [submissionKey, res];
 };
@@ -208,9 +207,10 @@ const sqsConsumer = (id) => {
         if (err) {
           reject(err);
         } else if (data.Messages) {
+          const timestamp = Date.now().toString();
           const [submissionKey, body] = await run(data.Messages[0].Body);
           await putJSON('result-' + submissionKey, body);
-          await sendSQSMessage(submissionKey, { key: submissionKey });
+          await sendSQSMessage(submissionKey + '-' + timestamp, { key: submissionKey });
           await deleteSQSMessage(data.Messages[0].ReceiptHandle);
         }
         resolve();
