@@ -1,14 +1,14 @@
 <!DOCTYPE html>
-<html lang="en-US">
+<html lang='en-US'>
 <head>
-  <meta charset="utf-8">
-  <meta name="author" content="Vighnesh Nayak S">
-  <meta name="description" content="remote code execution service">
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
-  <link rel="manifest" href="site.webmanifest">
-  <style type="text/css">
+  <meta charset='utf-8'>
+  <meta name='author' content='Vighnesh Nayak S'>
+  <meta name='description' content='remote code execution service'>
+  <link rel='apple-touch-icon' sizes='180x180' href='apple-touch-icon.png'>
+  <link rel='icon' type='image/png' sizes='32x32' href='favicon-32x32.png'>
+  <link rel='icon' type='image/png' sizes='16x16' href='favicon-16x16.png'>
+  <link rel='manifest' href='site.webmanifest'>
+  <style type='text/css'>
     #grid-container {
       display: grid;
       grid-template-columns: auto auto auto;
@@ -45,58 +45,82 @@
       cursor: auto;
     }      
     #navbar {
-      background-color: midnightblue;
       margin: auto;
-      width: 50%;
-      padding: 4px;
+      width: 95%;
       display: flex;
       justify-content: space-between;
     }
   </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.63.3/codemirror.min.css" integrity="sha512-6sALqOPMrNSc+1p5xOhPwGIzs6kIlST+9oGWlI4Wwcbj1saaX9J3uzO3Vub016dmHV7hM+bMi/rfXLiF5DNIZg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <script src='https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.63.3/codemirror.min.js' integrity='sha512-XMlgZzPyVXf1I/wbGnofk1Hfdx+zAWyZjh6c21yGo/k1zNC4Ve6xcQnTDTCHrjFGsOrVicJsBURLYktVEu/8vQ==' crossorigin='anonymous' referrerpolicy='no-referrer'></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.63.3/mode/python/python.min.js" integrity="sha512-/mavDpedrvPG/0Grj2Ughxte/fsm42ZmZWWpHz1jCbzd5ECv8CB7PomGtw0NAnhHmE/lkDFkRMupjoohbKNA1Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.63.3/mode/clike/clike.min.js" integrity="sha512-GAled7oA9WlRkBaUQlUEgxm37hf43V2KEMaEiWlvBO/ueP2BLvBLKN5tIJu4VZOTwo6Z4XvrojYngoN9dJw2ug==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.63.3/theme/monokai.min.css" integrity="sha512-R6PH4vSzF2Yxjdvb2p2FA06yWul+U0PDDav4b/od/oXf9Iw37zl10plvwOXelrjV2Ai7Eo3vyHeyFUjhXdBCVQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <title>rexe</title>
 </head>
 <body>
-  <div id="navbar">
-    <span id="username"></span>
+  <div id='navbar'>
+    <span id='username'></span>
     <div>
-      <button onclick="signOut()">Log out</button>
+      <button onclick='signOut()'>Log out</button>
     </div>
   </div>   
-  <div id="grid-container">
-    <div id="code_div">     
+  <div id='grid-container'>
+    <div id='code_div'>     
       <p>
         <span>
-          <select name="cars" id="lang">
-            <option value="cpp">C++</option>
-            <option value="py">Python</option>
+          <select name='cars' id='lang' onchange='changeLang()'>
+            <option value='cpp'>C++</option>
+            <option value='py'>Python</option>
           </select>          
-          <input placeholder="filename" id="filename" type="text">
-          <button id="load">Load</button>
-          <button id="save">Save</button>
-          <button id="run" onclick="run()">Run</button>
-          <span id="info"></span>
+          <input placeholder='filename' id='filename' type='text'>
+          <button id='load'>Load</button>
+          <button id='save'>Save</button>
+          <button id='run' onclick='run()'>Run</button>
+          <span id='info'></span>
         </span>
       </p>
-      <textarea spellcheck="false" id="code" rows="40" cols="130" placeholder="write your code here"></textarea>
+      <textarea spellcheck='false' id='code' rows='40' cols='130'></textarea>
     </div>
-    <div id="input_div">
+    <div id='input_div'>
       <p>
         <span>
-          <input id="time_limit" type="text" placeholder="time limit:[2, 7] seconds">
-          <input id="memory_limit" type="text" placeholder="memory limit:[32, 512] MB">
+          <input id='time_limit' type='text' placeholder='time limit:[2, 7] seconds'>
+          <input id='memory_limit' type='text' placeholder='memory limit:[32, 512] MB'>
         </span>
       </p>
-      <textarea spellcheck="false" id="input" rows="18" cols="80" placeholder="stdin"></textarea>
+      <textarea spellcheck='false' id='input' rows='18' cols='80' placeholder='stdin'></textarea>
     </div>
-    <div id="output_div">
+    <div id='output_div'>
       <p>
-        <span id="execInfo"></span>
+        <span id='execInfo'></span>
       </p>
-      <textarea id="output" spellcheck="false" id="output" rows="18" cols="80" placeholder="stdout" readonly></textarea>
+      <textarea id='output' spellcheck='false' id='output' rows='18' cols='80' placeholder='stdout' readonly></textarea>
     </div>    
   </div> 
-  <p style="margin-left: 3%;">Total size of code and test cases cannot exceed 256KB. Output is restricted to 500 KB.</p>
-  <script type="text/javascript">
+  <p style='margin-left: 3%;'>Total size of code and test cases cannot exceed 256KB. Output is restricted to 500 KB.</p>  
+  <script type='text/javascript'>
+    document.addEventListener('keydown', e => {
+      if (e.ctrlKey && e.key === 's') {
+        e.preventDefault();
+        console.log('CTRL + S');
+      }
+    });
+
+    const editor = CodeMirror.fromTextArea(document.getElementById('code'), {
+      lineNumbers: true,
+      lineWrapping: true,
+      mode: 'text/x-c++src',
+      tabSize: 2,
+      theme: 'monokai',
+      autofocus: true
+    });
+    editor.setSize('75em', '51em');
+
+    function changeLang() {
+      editor.setOption('mode', document.getElementById('lang').value === 'cpp' ? 'text/x-c++src' : 'python');
+    }
+
     function disableOps() {
       ['load', 'save', 'run'].forEach((e) => {
         document.getElementById(e).style.cursor = 'not-allowed';
@@ -231,18 +255,6 @@
       .then(() => {
         document.getElementById('username').innerText = document.cookie.split('=')[1];
       });
-    // /* source: https://stackoverflow.com/questions/6637341/use-tab-to-indent-in-textarea */
-    // function enableTab(e) {
-    //   if (e.key == 'Tab') {
-    //     e.preventDefault();
-    //     let start = this.selectionStart;
-    //     let end = this.selectionEnd;
-    //     this.value = this.value.substring(0, start) + '\t' + this.value.substring(end);
-    //     this.selectionStart = this.selectionEnd = start + 1;
-    //   }      
-    // }
-    // document.getElementById('code').addEventListener('keydown', enableTab(e));
-    // document.getElementById('input').addEventListener('keydown', enableTab(e));
   </script> 
 </body>
 </html>
