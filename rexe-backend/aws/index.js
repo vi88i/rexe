@@ -102,8 +102,29 @@ const getJSON = (key, bucket) => {
   });
 };
 
+const checkIfObjectExist = (key, bucket) => {
+  return new Promise((resolve, reject) => {
+    const params = {
+      Bucket: bucket,
+      Key: key
+    };
+    s3.headObject(params, (err) => {
+      if (err) {
+        if (['Not Found', 'Forbidden'].indexOf(err.code) > -1) {
+          resolve(false);
+        } else {
+          reject(err);
+        }
+      } else {
+        resolve(true);
+      }
+    });
+  });
+};
+
 exports.putJSON = putJSON;
 exports.getJSON = getJSON;
+exports.checkIfObjectExist = checkIfObjectExist;
 exports.enqueue = enqueue;
 exports.dequeue = dequeue;
 exports.getRandomId = getRandomId;

@@ -12,7 +12,7 @@ const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
 const express = require('express');
 const db = require('./mysqldb/index');
-const { enqueue, putJSON, dequeue, deleteSQSMessage, getRandomId, getJSON } = require('./aws/index');
+const { enqueue, putJSON, dequeue, deleteSQSMessage, getRandomId, getJSON, checkIfObjectExist } = require('./aws/index');
 const { redisAuthClient, redisSubClient } = require('./redisdb/index');
 
 process.on('SIGINT', async () => {
@@ -317,6 +317,31 @@ app.post('/check', requireAuthorization, async (req, res, next) => {
     }
   } else {
     res.status(200).json({ status: 'stop' });
+  }
+});
+
+app.post('/load', requireAuthorization, async (req, res, next) => {
+  try {
+    const { filename, lang } = req.body, username = res.locals.username;
+    const requestSubmissionKey = ['request', username, filename, lang].join('-');
+    const resultSubmissionKey = ['result', username, filename, lang].join('-');
+    let status = await checkIfObjectExist(requestSubmissionKey, process.env.S3_BUCKET);
+    if (status) {
+      status = await checkIfObjectExist(requestSubmissionKey, process.env.S3_BUCKET);
+      if (status) {
+        res.status(200).json({ 
+          msg: 'Success', 
+          request: await getJSON(requestSubmissionKey, process.env.S3_BUCKET), 
+          result: await getJSON(resultSubmissionKey, process.env.S3_BUCKET) 
+        });
+      } else {
+        res.status(200).json({ msg: 'Success', request: await getJSON(requestSubmissionKey, process.env.S3_BUCKET) });
+      }      
+    } else {
+      res.status(200).json({ msg: 'Failed' });
+    }
+  } catch(err) {
+    next(err);
   }
 });
 

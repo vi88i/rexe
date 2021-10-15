@@ -74,7 +74,7 @@
             <option value='py'>Python</option>
           </select>          
           <input placeholder='filename' id='filename' type='text'>
-          <button id='load'>Load</button>
+          <button id='load' onclick='load()'>Load</button>
           <button id='save'>Save</button>
           <button id='run' onclick='run()'>Run</button>
           <span id='info'></span>
@@ -155,9 +155,48 @@
       }      
     }
 
+    async function load() {
+      try {
+        const body = {
+          filename: document.getElementById('filename').value,
+          lang: document.getElementById('lang').value
+        };
+        const options = {
+          mode: 'same-origin',
+          cache: 'no-store',
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(body)
+        };
+        const res = await fetch('/load', options);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.msg === 'Failed') {
+            document.getElementById('info').value = 'Failed to load file';
+          } else {
+            editor.setValue(data.request.code);
+            document.getElementById('input').innerHTML = data.request.input;
+            document.getElementById('time_limit').value = data.request.time_limit;
+            document.getElementById('memory_limit').value = data.request.memory_limit;
+            document.getElementById('output').innerHTML = data.result.output;
+            const info = [
+              data.result.status, data.result.signal !== null ? data.result.signal : '', 
+              data.result.time !== null ? data.result.time.toFixed(1) + 'ms' : '', 
+              data.result.memory !== null ? data.result.memory.toFixed(1) + 'MB' : ''
+            ].join(' ').replace(/\s+/g,' ').trim();
+            document.getElementById('execInfo').innerHTML = info;
+            document.getElementById('info').innerHTML = 'File loaded';
+          }
+        }
+      } catch(err) {
+        console.log(err);
+      }
+    }
+
     async function run() {
       const f = document.getElementById('filename');
-      const c = document.getElementById('code');
       const t = document.getElementById('input');
       const l = document.getElementById('lang');
       const ti = document.getElementById('time_limit');
@@ -176,7 +215,7 @@
           },
           body: JSON.stringify({ 
             filename: f.value, 
-            code: c.value, 
+            code: editor.getValue(), 
             input: t.value, 
             lang: l.value, 
             time_limit: ti.value, 
@@ -211,7 +250,11 @@
                   document.getElementById('info').innerText = 'Submission timeout';
                   enableOps(poll);
                 } else if (json.status !== 'pending') {
-                  const info = [json.status, json.signal !== null ? json.signal : '', json.time !== null ? json.time.toFixed(1) + 'ms' : '', json.memory !== null ? json.memory.toFixed(1) + 'MB' : ''].join(' ').replace(/\s+/g,' ').trim();
+                  const info = [
+                    json.status, json.signal !== null ? json.signal : '', 
+                    json.time !== null ? json.time.toFixed(1) + 'ms' : '', 
+                    json.memory !== null ? json.memory.toFixed(1) + 'MB' : ''
+                  ].join(' ').replace(/\s+/g,' ').trim();                  
                   document.getElementById('info').innerText = 'Finished';
                   document.getElementById('execInfo').innerHTML = info;
                   document.getElementById('output').innerHTML = json.output;
