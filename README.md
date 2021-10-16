@@ -30,6 +30,7 @@ On multiple occasions programmers system crashes/freezes while solving an algori
 ![error](./assets/error.png)
 ![tle](./assets/tle.png)
 ![segfault](./assets/segfault.png)
+![backend](./assets/backend.png)
 
 ## TODO
 
