@@ -23,6 +23,7 @@
 
 ![ui](./assets/ui.png)
 ![normal](./assets/normal.png)
+![error](./assets/error.png)
 ![tle](./assets/tle.png)
 ![segfault](./assets/segfault.png)
 
