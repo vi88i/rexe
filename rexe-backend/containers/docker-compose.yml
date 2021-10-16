@@ -1,0 +1,20 @@
+version: "3.9"
+services:
+  cppjudge:
+    build:
+      context: ./cpp
+    deploy:
+      mode: replicated
+      replicas: 2
+      restart_policy:
+        delay: 5s
+        max_attempts: 5
+  pyjudge:
+    build:
+      context: ./py
+    deploy:
+      mode: replicated
+      replicas: 2
+      restart_policy:
+        delay: 5s
+        max_attempts: 5

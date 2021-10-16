@@ -4,7 +4,7 @@
 
 ## Motivation
 
-On multiple occasions programmers system crashes/freezes while solving an algorithmic problems because of executing them on bare-metal system without any resource constraints, this requires them to restart their entire system. And rebooting system will eat up their contest time.
+On multiple occasions programmers system crashes/freezes while solving an algorithmic problems because of executing unsafe/untested code on bare-metal system without any resource constraints, this requires them to restart their entire system. And rebooting system will eat up their contest time.
 
 ## Features
 
@@ -30,3 +30,7 @@ On multiple occasions programmers system crashes/freezes while solving an algori
 ![error](./assets/error.png)
 ![tle](./assets/tle.png)
 ![segfault](./assets/segfault.png)
+
+## TODO
+
+- Run containers as non-root users, restrict user from executing shell commands programatically.

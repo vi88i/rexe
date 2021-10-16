@@ -336,7 +336,6 @@ app.post('/load', requireAuthorization, async (req, res, next) => {
     } catch(err) {
       console.log(err);
     }   
-    console.log(resultStatus, requestStatus);
     if (resultStatus && requestStatus) {
       res.status(200).json({ 
         msg: 'Success', 
