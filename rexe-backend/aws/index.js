@@ -102,6 +102,23 @@ const getJSON = (key, bucket) => {
   });
 };
 
+const delJSON = (key, bucket) => {
+  return new Promise((resolve, reject) => {
+    const params = {
+      Bucket: bucket,
+      Key: key
+    };
+    
+    s3.deleteObject(params, (err, data) => {
+      if ((err && ['Not Found'].indexOf(err.code) > -1) || !data) {
+        resolve();
+      } else {
+        reject(err);
+      }
+    });
+  });
+};
+
 const checkIfObjectExist = (key, bucket) => {
   return new Promise((resolve, reject) => {
     const params = {
@@ -124,6 +141,7 @@ const checkIfObjectExist = (key, bucket) => {
 
 exports.putJSON = putJSON;
 exports.getJSON = getJSON;
+exports.delJSON = delJSON;
 exports.checkIfObjectExist = checkIfObjectExist;
 exports.enqueue = enqueue;
 exports.dequeue = dequeue;

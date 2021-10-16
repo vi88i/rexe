@@ -12,7 +12,7 @@ const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
 const express = require('express');
 const db = require('./mysqldb/index');
-const { enqueue, putJSON, dequeue, deleteSQSMessage, getRandomId, getJSON, checkIfObjectExist } = require('./aws/index');
+const { enqueue, putJSON, delJSON, dequeue, deleteSQSMessage, getRandomId, getJSON, checkIfObjectExist } = require('./aws/index');
 const { redisAuthClient, redisSubClient } = require('./redisdb/index');
 
 process.on('SIGINT', async () => {
@@ -325,20 +325,52 @@ app.post('/load', requireAuthorization, async (req, res, next) => {
     const { filename, lang } = req.body, username = res.locals.username;
     const requestSubmissionKey = ['request', username, filename, lang].join('-');
     const resultSubmissionKey = ['result', username, filename, lang].join('-');
-    let status = await checkIfObjectExist(requestSubmissionKey, process.env.S3_BUCKET);
-    if (status) {
-      status = await checkIfObjectExist(requestSubmissionKey, process.env.S3_BUCKET);
-      if (status) {
-        res.status(200).json({ 
-          msg: 'Success', 
-          request: await getJSON(requestSubmissionKey, process.env.S3_BUCKET), 
-          result: await getJSON(resultSubmissionKey, process.env.S3_BUCKET) 
-        });
-      } else {
-        res.status(200).json({ msg: 'Success', request: await getJSON(requestSubmissionKey, process.env.S3_BUCKET) });
-      }      
+    let resultStatus = false, requestStatus = false;
+    try {
+      resultStatus = await checkIfObjectExist(resultSubmissionKey, process.env.S3_BUCKET);
+    } catch(err) {
+      console.log(err);
+    }
+    try {
+      requestStatus = await checkIfObjectExist(requestSubmissionKey, process.env.S3_BUCKET);
+    } catch(err) {
+      console.log(err);
+    }   
+    console.log(resultStatus, requestStatus);
+    if (resultStatus && requestStatus) {
+      res.status(200).json({ 
+        msg: 'Success', 
+        request: await getJSON(requestSubmissionKey, process.env.S3_BUCKET), 
+        result: await getJSON(resultSubmissionKey, process.env.S3_BUCKET) 
+      });      
+    } else if (requestStatus) {
+      res.status(200).json({ 
+        msg: 'Success', 
+        request: await getJSON(requestSubmissionKey, process.env.S3_BUCKET) 
+      });
     } else {
       res.status(200).json({ msg: 'Failed' });
+    }
+  } catch(err) {
+    next(err);
+  }
+});
+
+app.post('/save', requireAuthorization, async (req, res, next) => {
+  try {
+    const { filename, code, lang } = req.body, username = res.locals.username;
+    if (filename && filename.length > 0 && code && code.length > 0) {
+      const requestSubmissionKey = ['request', username, filename, lang].join('-');
+      const resultSubmissionKey = ['result', username, filename, lang].join('-');
+      await delJSON(resultSubmissionKey, process.env.S3_BUCKET);      
+      await putJSON(
+        requestSubmissionKey,
+        req.body,
+        process.env.S3_BUCKET
+      );
+      res.status(200).json({ msg: 'Saved' });
+    } else {
+      res.status(200).json({ msg: 'Filename and code cannot be empty' });
     }
   } catch(err) {
     next(err);

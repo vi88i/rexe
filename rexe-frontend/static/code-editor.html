@@ -75,7 +75,7 @@
           </select>          
           <input placeholder='filename' id='filename' type='text'>
           <button id='load' onclick='load()'>Load</button>
-          <button id='save'>Save</button>
+          <button id='save' onclick='save()'>Save</button>
           <button id='run' onclick='run()'>Run</button>
           <span id='info'></span>
         </span>
@@ -100,10 +100,10 @@
   </div> 
   <p style='margin-left: 3%;'>Total size of code and test cases cannot exceed 256KB. Output is restricted to 500 KB.</p>  
   <script type='text/javascript'>
-    document.addEventListener('keydown', e => {
+    document.addEventListener('keydown', async (e) => {
       if (e.ctrlKey && e.key === 's') {
         e.preventDefault();
-        console.log('CTRL + S');
+        await save();
       }
     });
 
@@ -177,21 +177,60 @@
           if (data.msg === 'Failed') {
             document.getElementById('info').value = 'Failed to load file';
           } else {
-            editor.setValue(data.request.code);
-            document.getElementById('input').innerHTML = data.request.input;
-            document.getElementById('time_limit').value = data.request.time_limit;
-            document.getElementById('memory_limit').value = data.request.memory_limit;
-            document.getElementById('output').innerHTML = data.result.output;
-            const info = [
-              data.result.status, data.result.signal !== null ? data.result.signal : '', 
-              data.result.time !== null ? data.result.time.toFixed(1) + 'ms' : '', 
-              data.result.memory !== null ? data.result.memory.toFixed(1) + 'MB' : ''
-            ].join(' ').replace(/\s+/g,' ').trim();
-            document.getElementById('execInfo').innerHTML = info;
+            if (data.request) {
+              editor.setValue(data.request.code);
+              document.getElementById('input').innerHTML = data.request.input;
+              document.getElementById('time_limit').value = data.request.time_limit;
+              document.getElementById('memory_limit').value = data.request.memory_limit;
+            }
+            if (data.result) {
+              document.getElementById('output').innerHTML = data.result.output;
+              const info = [
+                data.result.status, data.result.signal !== null ? data.result.signal : '', 
+                data.result.time !== null ? data.result.time.toFixed(1) + 'ms' : '', 
+                data.result.memory !== null ? data.result.memory.toFixed(1) + 'MB' : ''
+              ].join(' ').replace(/\s+/g,' ').trim();
+              document.getElementById('execInfo').innerHTML = info;
+            }
             document.getElementById('info').innerHTML = 'File loaded';
           }
+        } else {
+          document.getElementById('info').innerHTML = 'Failed to load'
         }
       } catch(err) {
+        console.log(err);
+      }
+    }
+
+    async function save() {
+      try {
+        const f = document.getElementById('filename');
+        const t = document.getElementById('input');
+        const l = document.getElementById('lang');
+        const ti = document.getElementById('time_limit');
+        const m = document.getElementById('memory_limit');
+
+        let options = {
+          method: 'POST',
+          mode: 'same-origin',
+          cache: 'no-store',
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ 
+            filename: f.value, 
+            code: editor.getValue(), 
+            input: t.value, 
+            lang: l.value, 
+            time_limit: ti.value, 
+            memory_limit: m.value   
+          })
+        };        
+        const res = await fetch('/save', options);
+        const data = await res.json();
+        document.getElementById('info').innerHTML = data.msg;
+      } catch (err) {
         console.log(err);
       }
     }
