@@ -178,7 +178,7 @@ const requireAuthorization = async (req, res, next) => {
   }
 };
 
-/* sign out the user */
+/* sign out the user and blacklist the token */
 app.get('/sign-out', requireAuthorization, async (req, res, next) => {
   try {
     if (req.signedCookies && req.signedCookies.token) {
@@ -196,7 +196,31 @@ app.get('/sign-out', requireAuthorization, async (req, res, next) => {
   }
 });
 
-/* process code submission */
+/* 
+  Processing of code submission
+  1. Check if filename and code is not empty
+  2. Check if previous submission for same request is still being processed (by querying for submission key in redis), 
+     if the previous submission is still being processed return 429, else continue.
+  3. Check if time and memory constraints are valid, else return 400
+  4. Find the md5 digest of the file (this is the token while short polling)
+  5. If (username, submission key, digest) is present in the MySQL database, don't enqueue the request
+     (result is available in S3, during short polling the user is provided with the result)
+  6. Otherwise,
+     6.1 Put the code and config in S3 bucket
+     6.2 Queue the submission key (it will help consumer identify which object should be grabbed from S3 for processing)
+     6.3 
+        - SET <submission key (key), '1'> in redis with TTL value which eqauls retention period of FIFO queue, 
+        While this <submission key (key), '1'> is present in redis it implies the request is still being processed,
+        this mapping is removed only when result is ready. (this is used to prevent duplicate submissions)
+        - Set md5 digest as cookie. When user uses short polling (user sends filename, language and cookie), 
+        the submission key and cookie is used to query the database to check if result is available.
+  7. Respond to client with suitable message   
+
+  NOTES:
+  - submission key = (username, filename, lang)
+  - the request and result are stored separately (key for request in S3: ('request', username, filename, lang), and ('result', username, filename, lang) 
+    for result). Reason: If in the future we want to store all versions of user submissions. 
+*/
 app.post('/run', requireAuthorization, async (req, res, next) => {
   let conn = null;
   try {
@@ -257,12 +281,13 @@ app.post('/run', requireAuthorization, async (req, res, next) => {
         await putJSON('request-' + submissionKey, packet, process.env.S3_BUCKET);
         console.log('[x] Queueing the submission request');
         await enqueue(
+          // if user submits within 5 min interval, deduplication id should be different, else the request is not queued immediately (check deuplication rules in AWS SQS for FIFO)
           submissionKey + '-' + timestamp, 
           lang === 'cpp' ? process.env.SQS_CPP_URL : process.env.SQS_PY_URL, 
-          { key: submissionKey }
+          { key: submissionKey, hash: digest }
         );
-        console.log('[x] Caching the submission digest');
-        await redisSubClient.sendCommand(['SET', submissionKey, digest, 'EX', process.env.SQS_SUBMISSON_RETENTION_PERIOD]);
+        console.log('[x] Caching the submission key');
+        await redisSubClient.sendCommand(['SET', submissionKey, '1', 'EX', process.env.SQS_SUBMISSON_RETENTION_PERIOD]);
       }
 
       res.cookie('file_hash', digest, {
@@ -286,6 +311,13 @@ app.post('/run', requireAuthorization, async (req, res, next) => {
   }
 });
 
+/*
+  Check if result is available:
+  - Generate the submission key and extract the hash from cookie
+  - If cookie is not found, it implies the the submission has timed out (retention period is over and request is removed from queue)
+  - If cookie is valid, query the MySQL database for (username, submission key, hash)
+  - If the tuple is present in database, get the result from S3 and send it to user
+*/
 app.post('/check', requireAuthorization, async (req, res, next) => {
   let conn = null;
   if (req.signedCookies && req.signedCookies.file_hash) {
@@ -320,6 +352,11 @@ app.post('/check', requireAuthorization, async (req, res, next) => {
   }
 });
 
+/* 
+  If result and request is available send both
+  else if request is available send request
+  else not found
+*/
 app.post('/load', requireAuthorization, async (req, res, next) => {
   try {
     const { filename, lang } = req.body, username = res.locals.username;
@@ -355,6 +392,12 @@ app.post('/load', requireAuthorization, async (req, res, next) => {
   }
 });
 
+/*
+  If user saves their work, delete any previous request if it exists. (currently we maintain only one (latest) version of submission)
+  NOTE: The result is not stored. It is assumed that user saves only when they make changes to code and config. If code and config
+  changes it most likely changes the output as well. If we don't delete the result when user saves, in later point of time
+  when user loads the file, the result may not correspond to changes made by user in code and config.
+*/
 app.post('/save', requireAuthorization, async (req, res, next) => {
   try {
     const { filename, code, lang } = req.body, username = res.locals.username;
@@ -376,7 +419,12 @@ app.post('/save', requireAuthorization, async (req, res, next) => {
   }
 });
 
-/* get responses from queue */
+/*  
+  Consume from result queue (uses long polling 20s): 
+  - Extract the submission key and hash from result queue
+  - Insert/Update into database
+  - Delete the message from queue
+*/
 (async function startSQSResponseConsumer() {
   const status = true;
   let retry = 0, id = getRandomId(), conn = null;
@@ -388,31 +436,24 @@ app.post('/save', requireAuthorization, async (req, res, next) => {
       const res = await dequeue(id, process.env.SQS_RES_URL);
       if (res) {
         res.forEach(async (e) => {
-          const submissionKey = JSON.parse(e.Body).key;
+          const { key: submissionKey, hash } = JSON.parse(e.Body);
           const username = submissionKey.split('-')[0];
-          const file_hash = await redisSubClient.get(submissionKey);
-          console.log(`[x] Received response for ${submissionKey} - ${file_hash}`);
-          if (file_hash) {
-            try {
-              conn = await db.getConnection();
-              console.log(`[x] Inserting ${submissionKey} - ${file_hash} into database`);
-              console.log(username, submissionKey, file_hash);
-              await db.query(conn, 'CALL insert_submission(?, ?, ?)', [username, submissionKey, file_hash]);
-            } catch (err) {
-              console.log(err);
-              if (err.code !== 'ER_DUP_ENTRY') {
-                throw err;
-              }
-            } finally {
-              if (conn && conn.state === 'authenticated') {
-                conn.release();
-              }
+          console.log(`[x] Received response for ${submissionKey} - ${hash}`);
+          try {
+            conn = await db.getConnection();
+            console.log(`[x] Inserting ${submissionKey} - ${hash} into database`);
+            await db.query(conn, 'CALL insert_submission(?, ?, ?)', [username, submissionKey, hash]);
+          } catch (err) {
+            next(err);
+          } finally {
+            if (conn && conn.state === 'authenticated') {
+              conn.release();
             }
-            console.log(`[x] Deleting ${submissionKey} - ${file_hash} from response queue`);
-            await deleteSQSMessage(e.ReceiptHandle, process.env.SQS_RES_URL);
-            console.log(`[x] Deleting ${submissionKey} - ${file_hash} from redis cache`);
-            await redisSubClient.del(submissionKey);            
           }
+          console.log(`[x] Deleting ${submissionKey} - ${hash} from response queue`);
+          await deleteSQSMessage(e.ReceiptHandle, process.env.SQS_RES_URL);
+          console.log(`[x] Deleting ${submissionKey} from redis cache`);
+          await redisSubClient.del(submissionKey);
         });
       }
       retry = 0, id = getRandomId();

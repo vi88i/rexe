@@ -73,9 +73,10 @@ const getJSON = (key) => {
 };
 
 const run = async (body) => {
-  const submissionKey = JSON.parse(body).key;
+  const { key: submissionKey, hash } = JSON.parse(body);
   const data = await getJSON('request-' + submissionKey);
-  console.log(submissionKey);
+
+  console.log(`${submissionKey} : ${hash}`);
 
   // write the user's code to code.py
   await new Promise((resolve, reject) => {
@@ -132,7 +133,7 @@ const run = async (body) => {
   });
   console.log(tmp);
 
-  return [submissionKey, res];
+  return [submissionKey, hash, res];
 };
 
 const getRandomId = () => {
@@ -186,9 +187,9 @@ const sqsConsumer = (id) => {
           reject(err);
         } else if (data.Messages) {
           const timestamp = Date.now().toString();
-          const [submissionKey, body] = await run(data.Messages[0].Body);
+          const [submissionKey, hash, body] = await run(data.Messages[0].Body);
           await putJSON('result-' + submissionKey, body);
-          await sendSQSMessage(submissionKey + '-' + timestamp, { key: submissionKey });
+          await sendSQSMessage(submissionKey + '-' + timestamp, { key: submissionKey, hash: hash });
           await deleteSQSMessage(data.Messages[0].ReceiptHandle);
         }
         resolve();
