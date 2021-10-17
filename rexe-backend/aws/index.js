@@ -18,6 +18,7 @@ const deleteSQSMessage = (id, url) => {
       QueueUrl: url,
       ReceiptHandle: id
     };
+    
     sqs.deleteMessage(deleteParams, (err) => {
       if (err) {
         reject(err);
@@ -35,6 +36,7 @@ const dequeue = (id, url) => {
       QueueUrl: url,
       ReceiveRequestAttemptId: id
     };
+    
     sqs.receiveMessage(params, async (err, data) => {
       try {
         if (err) {
@@ -58,7 +60,8 @@ const enqueue = (key, url, packet) => {
       MessageDeduplicationId: key,
       MessageGroupId: process.env.SQS_GROUP,    
       QueueUrl: url
-    };    
+    }; 
+
     sqs.sendMessage(params, (err) => {
       if (err) {
         reject(err);
@@ -76,6 +79,7 @@ const putJSON = (key, body, bucket) => {
       Key: key,
       Body: JSON.stringify(body)
     };
+
     s3.upload(params, (err) => {
       if (err) {
         reject(err);
@@ -92,6 +96,7 @@ const getJSON = (key, bucket) => {
       Bucket: bucket,
       Key: key
     };
+
     s3.getObject(params, (err, data) => {
       if (err) {
         reject(err);
@@ -125,6 +130,7 @@ const checkIfObjectExist = (key, bucket) => {
       Bucket: bucket,
       Key: key
     };
+
     s3.headObject(params, (err) => {
       if (err) {
         if (['Not Found', 'Forbidden'].indexOf(err.code) > -1) {

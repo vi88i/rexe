@@ -42,7 +42,3 @@ On multiple occasions programmers system crashes/freezes while solving an algori
 ![tle](./assets/tle.png)
 ![segfault](./assets/segfault.png)
 ![backend](./assets/backend.png)
-
-## TODO
-
-- Run containers as non-root users, restrict user from executing shell commands programatically.
