@@ -266,8 +266,8 @@ app.post('/run', requireAuthorization, async (req, res, next) => {
       console.log('[x] Checking if same submission exists in database');
       const { rows } = await db.query(
         conn, 
-        'SELECT COUNT(username) AS count FROM submissions WHERE username=? AND submission=? AND file_hash=?', 
-        [username, submissionKey, digest]
+        'SELECT COUNT(username) AS count FROM submissions WHERE username=? AND fname=? AND lang=? AND file_hash=?', 
+        [username, filename, lang, digest]
       );
 
       if (rows[0].count == 0) {
@@ -329,8 +329,8 @@ app.post('/check', requireAuthorization, async (req, res, next) => {
       conn = await db.getConnection();
       const { rows } = await db.query(
         conn, 
-        'SELECT COUNT(username) AS count FROM submissions WHERE username=? AND submission=? AND file_hash=?', 
-        [username, submissionKey, req.signedCookies.file_hash]
+        'SELECT COUNT(username) AS count FROM submissions WHERE username=? AND fname=? AND lang=? AND file_hash=?', 
+        [username, filename, lang, req.signedCookies.file_hash]
       );
       if (rows[0].count > 0) {
         console.log('[x] Fetching data from S3');
@@ -437,12 +437,13 @@ app.post('/save', requireAuthorization, async (req, res, next) => {
       if (res) {
         res.forEach(async (e) => {
           const { key: submissionKey, hash } = JSON.parse(e.Body);
-          const username = submissionKey.split('-')[0];
+          const splits = submissionKey.split('-');
+          const username = splits[0], filename = splits.slice(1, splits.length - 1).join('-'), lang = splits[splits.length - 1];
           console.log(`[x] Received response for ${submissionKey} - ${hash}`);
           try {
             conn = await db.getConnection();
             console.log(`[x] Inserting ${submissionKey} - ${hash} into database`);
-            await db.query(conn, 'CALL insert_submission(?, ?, ?)', [username, submissionKey, hash]);
+            await db.query(conn, 'CALL insert_submission(?, ?, ?, ?)', [username, filename, lang, hash]);
           } catch (err) {
             next(err);
           } finally {
